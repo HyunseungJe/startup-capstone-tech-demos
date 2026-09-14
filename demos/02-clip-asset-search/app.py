@@ -1,4 +1,4 @@
-"""Small, local CLIP asset search demo. Run with uv run python app.py."""
+"""Small, local Jina CLIP v2 asset search demo. Run with uv run python app.py."""
 
 from __future__ import annotations
 
@@ -14,25 +14,27 @@ import gradio as gr
 import numpy as np
 from PIL import Image, ImageOps, UnidentifiedImageError
 import torch
-from transformers import CLIPModel, CLIPProcessor
+from transformers import AutoModel
 
 
-MODEL_ID = "openai/clip-vit-base-patch32"
+MODEL_ID = "jinaai/jina-clip-v2"
+EMBEDDING_DIM = 512
 EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 CACHE_DIR = Path(__file__).resolve().parent / ".cache"
 MODEL_LOCK = Lock()
 MODEL = None
-PROCESSOR = None
+
+
+def runtime_device() -> str:
+    return "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def get_model():
-    global MODEL, PROCESSOR
+    global MODEL
     with MODEL_LOCK:
         if MODEL is None:
-            processor = CLIPProcessor.from_pretrained(MODEL_ID)
-            model = CLIPModel.from_pretrained(MODEL_ID).eval()
-            PROCESSOR, MODEL = processor, model
-    return MODEL, PROCESSOR
+            MODEL = AutoModel.from_pretrained(MODEL_ID, trust_remote_code=True).to(runtime_device()).eval()
+    return MODEL
 
 
 def asset_root(folder: str) -> Path:
@@ -45,7 +47,9 @@ def asset_root(folder: str) -> Path:
 
 
 def cache_path(root: Path) -> Path:
-    key = hashlib.sha256(f"{root}|{MODEL_ID}|rgb-background-240-v1".encode()).hexdigest()
+    key = hashlib.sha256(
+        f"{root}|{MODEL_ID}|dim-{EMBEDDING_DIM}|rgb-background-240-v1".encode()
+    ).hexdigest()
     return CACHE_DIR / f"{key}.npz"
 
 
@@ -56,9 +60,29 @@ def read_image(path: Path) -> Image.Image:
         return Image.alpha_composite(background, rgba).convert("RGB")
 
 
-def normalized(tensor: torch.Tensor) -> np.ndarray:
-    tensor = tensor / tensor.norm(dim=-1, keepdim=True).clamp_min(1e-12)
-    return tensor.detach().cpu().numpy().astype(np.float32)
+def normalized(values) -> np.ndarray:
+    if torch.is_tensor(values):
+        values = values.detach().float().cpu().numpy()
+    array = np.asarray(values, dtype=np.float32)
+    return array / np.maximum(np.linalg.norm(array, axis=-1, keepdims=True), 1e-12)
+
+
+def encode_images(model, images) -> np.ndarray:
+    try:
+        embeddings = model.encode_image(images, truncate_dim=EMBEDDING_DIM)
+    except torch.cuda.OutOfMemoryError as error:
+        torch.cuda.empty_cache()
+        raise RuntimeError(
+            "GPU 메모리가 부족합니다. 인덱싱 배치 크기를 줄이거나 CPU로 실행하세요."
+        ) from error
+    return normalized(embeddings)
+
+
+def encode_query(model, query: str) -> np.ndarray:
+    embeddings = model.encode_text(
+        [query], task="retrieval.query", truncate_dim=EMBEDDING_DIM
+    )
+    return normalized(embeddings)[0]
 
 
 def build_index(folder: str, progress=None) -> str:
@@ -67,8 +91,8 @@ def build_index(folder: str, progress=None) -> str:
     if not files:
         raise ValueError("PNG, JPG, JPEG, WebP 이미지가 없습니다.")
     if progress:
-        progress(0, desc="CLIP 로딩 중 (최초 실행 시 모델 다운로드)")
-    model, processor = get_model()
+        progress(0, desc=f"Jina CLIP v2 로딩 중 ({runtime_device()})")
+    model = get_model()
     names, features, skipped = [], [], []
     batch_size = 16
     for start in range(0, len(files), batch_size):
@@ -80,9 +104,8 @@ def build_index(folder: str, progress=None) -> str:
             except (OSError, ValueError, UnidentifiedImageError, Image.DecompressionBombError):
                 skipped.append(str(path.relative_to(root)))
         if images:
-            inputs = processor(images=images, return_tensors="pt")
             with torch.inference_mode():
-                features.append(normalized(model.get_image_features(**inputs)))
+                features.append(encode_images(model, images))
             names.extend(batch_names)
         if progress:
             progress(min(start + batch_size, len(files)) / len(files), desc=f"인덱싱: {min(start + batch_size, len(files))}/{len(files)}")
@@ -106,17 +129,16 @@ def build_index(folder: str, progress=None) -> str:
 def search_assets(folder: str, query: str, top_k: int = 12):
     root = asset_root(folder)
     if not query.strip():
-        raise ValueError("영어 검색 문장을 입력하세요.")
+        raise ValueError("검색 문장을 입력하세요.")
     target = cache_path(root)
     if not target.exists():
         raise ValueError("이 폴더의 인덱스가 없습니다. 먼저 인덱싱하세요.")
     with np.load(target, allow_pickle=False) as index:
         paths = index["paths"].tolist()
         vectors = index["vectors"]
-    model, processor = get_model()
-    inputs = processor(text=[query.strip()], return_tensors="pt", padding=True, truncation=True)
+    model = get_model()
     with torch.inference_mode():
-        query_vector = normalized(model.get_text_features(**inputs))[0]
+        query_vector = encode_query(model, query.strip())
     scores = vectors @ query_vector
     results = []
     for position in np.argsort(-scores):
@@ -158,14 +180,28 @@ def search_ui(folder, query, top_k):
 
 
 def create_app():
-    with gr.Blocks(title="CLIP Game Asset Search") as demo:
-        gr.Markdown("# CLIP Game Asset Search\n파일명이나 태그 없이, 이미지의 의미로 게임 에셋을 검색합니다.")
+    device = runtime_device()
+    with gr.Blocks(title="Jina CLIP v2 Game Asset Search") as demo:
+        gr.Markdown(
+            "# Jina CLIP v2 Game Asset Search\n"
+            "파일명이나 태그 없이 한국어·영어 문장으로 게임 에셋을 검색합니다.\n\n"
+            f"`{MODEL_ID}` · 512차원 임베딩 · 실행 장치: **{device}**"
+        )
         folder = gr.Textbox(label="로컬 에셋 폴더", placeholder=r"C:\assets\icons")
         index_button = gr.Button("인덱싱 / 다시 인덱싱")
         index_status = gr.Textbox(label="인덱스 상태", interactive=False)
-        gr.Markdown("최초 인덱싱 시 모델을 다운로드합니다. 저장된 인덱스는 재실행 후에도 사용할 수 있습니다. 에셋 추가·수정·삭제 후에는 다시 인덱싱하세요.")
-        query = gr.Textbox(label="검색 문장 (영어)", placeholder="a rusty sword")
-        gr.Examples(examples=[["a rusty sword"], ["a red health potion"], ["a wooden treasure chest"], ["a round metal shield"]], inputs=query)
+        gr.Markdown("최초 인덱싱 시 약 0.9B 파라미터 모델을 다운로드합니다. 저장된 인덱스는 재실행 후에도 사용할 수 있습니다. 에셋 추가·수정·삭제 후에는 다시 인덱싱하세요.")
+        query = gr.Textbox(label="검색 문장 (한국어 또는 영어)", placeholder="붉은색 회복 포션")
+        gr.Examples(
+            examples=[
+                ["붉은색 회복 포션"],
+                ["근육질 판타지 전사"],
+                ["어두운 숲 배경"],
+                ["a rusty sword"],
+                ["a blue magic item"],
+            ],
+            inputs=query,
+        )
         top_k = gr.Slider(minimum=1, maximum=24, value=12, step=1, label="결과 개수")
         search_button = gr.Button("검색", variant="primary")
         search_status = gr.Textbox(label="검색 상태", interactive=False)

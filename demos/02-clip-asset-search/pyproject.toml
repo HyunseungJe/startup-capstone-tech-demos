@@ -4,9 +4,19 @@ version = "0.1.0"
 description = "Local natural-language search for game asset images"
 requires-python = ">=3.11,<3.13"
 dependencies = [
+    "einops>=0.8,<1",
     "gradio>=5.0,<7",
     "numpy>=1.26,<3",
     "pillow>=10,<13",
+    "timm>=1.0,<2",
     "torch>=2.4,<3",
     "transformers>=4.45,<5",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
