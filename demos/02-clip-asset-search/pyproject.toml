@@ -1,0 +1,12 @@
+[project]
+name = "clip-asset-search"
+version = "0.1.0"
+description = "Local natural-language search for game asset images"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "gradio>=5.0,<7",
+    "numpy>=1.26,<3",
+    "pillow>=10,<13",
+    "torch>=2.4,<3",
+    "transformers>=4.45,<5",
+]
