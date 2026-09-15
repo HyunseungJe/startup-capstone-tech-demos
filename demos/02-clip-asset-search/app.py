@@ -26,7 +26,12 @@ MODEL = None
 
 
 def runtime_device() -> str:
-    return "cuda" if torch.cuda.is_available() else "cpu"
+    requested = os.getenv("DEVICE", "auto").strip().lower()
+    if requested == "auto":
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    if requested not in {"cpu", "cuda"}:
+        raise ValueError("DEVICE는 auto, cpu, cuda 중 하나여야 합니다.")
+    return requested
 
 
 def get_model():

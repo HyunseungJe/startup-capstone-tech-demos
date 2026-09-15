@@ -32,3 +32,20 @@
 - 데모별 환경과 의존성은 해당 폴더 안에서 관리합니다.
 - 데모 사이의 중복은 허용하고, 반복 사용이 확인된 코드만 `shared/`로 이동합니다.
 - 생성 결과, 캐시, 로컬 가상환경은 커밋하지 않습니다.
+
+## PyTorch 실행 환경
+
+PyTorch를 사용하는 데모는 기본적으로 CPU와 CUDA 13.0 환경을 모두 지원하며,
+실행할 머신에 맞는 uv extra를 하나 선택합니다.
+
+```powershell
+# CPU 환경
+uv run --extra cpu python app.py
+
+# NVIDIA GPU / CUDA 13.0 환경
+uv run --extra cu130 python app.py
+```
+
+명령은 해당 데모 폴더에서 실행합니다. `cpu`와 `cu130`은 서로 다른 PyTorch
+패키지를 사용하므로 동시에 선택하지 않습니다. 각 데모의 구체적인 실행 방법과
+추가 옵션은 해당 데모의 `README.md`를 확인하세요.

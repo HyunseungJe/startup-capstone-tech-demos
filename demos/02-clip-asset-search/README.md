@@ -4,20 +4,37 @@ uv + Python으로 실행하는 로컬 게임 이미지 에셋 자연어 검색 �
 파일명이나 태그를 검색에 사용하지 않고 `jinaai/jina-clip-v2` 이미지·텍스트 벡터의
 코사인 유사도로 정렬합니다. 한국어와 영어 검색을 모두 지원합니다.
 
-## 실행
+## 설치 및 실행
 
-PowerShell에서:
+노트북처럼 CUDA GPU를 사용하지 않는 PC에서는 PowerShell에서:
 
 ```powershell
-cd C:\work\tech-demos\demos\02-clip-asset-search
-uv run python app.py
+cd C:\work\tech-demo\demos\02-clip-asset-search
+uv run --extra cpu python app.py
+```
+
+NVIDIA GPU를 사용하는 데스크탑에서는 CUDA 13.0 빌드로 실행합니다.
+
+```powershell
+cd C:\work\tech-demo\demos\02-clip-asset-search
+uv run --extra cu130 python app.py
 ```
 
 브라우저에서 http://127.0.0.1:7860 을 엽니다.
-uv가 잠금 파일에 맞춰 Python 환경과 CUDA용 PyTorch를 준비합니다.
+uv가 선택한 프로필에 맞춰 독립 가상환경과 PyTorch를 준비합니다.
+두 프로필은 동시에 선택할 수 없습니다.
 첫 인덱싱 또는 검색 시 Hugging Face에서 `jinaai/jina-clip-v2`와 원격 구현 코드를 다운로드합니다.
 모델은 약 0.9B 파라미터이므로 인터넷 연결, 디스크 공간과 첫 로딩 시간이 필요합니다.
 CUDA GPU가 있으면 자동으로 사용하고, 없으면 CPU로 폴백합니다. 현재 장치는 앱 상단에 표시됩니다.
+설치 프로필과 별개로 실행 장치를 강제하려면 `DEVICE`를 지정할 수 있습니다.
+
+```powershell
+$env:DEVICE = "cpu"  # auto, cpu, cuda 중 하나
+uv run --extra cu130 python app.py
+Remove-Item Env:DEVICE
+```
+
+기본값은 `auto`입니다. 머신별 설정을 담는 `.env` 파일은 Git에서 제외됩니다.
 모델을 한 번 실제 사용해 필요한 지연 로딩 파일까지 받은 뒤 오프라인 실행하려면
 `$env:HF_HUB_OFFLINE = "1"`을 설정할 수 있습니다.
 
@@ -34,14 +51,14 @@ UI에는 로컬 이미지 파일 대신 생성한 썸네일을 전달합니다.
 ## 명령줄 실행
 
 ```powershell
-uv run python app.py --index C:\assets\icons
-uv run python app.py --folder C:\assets\icons --search "붉은색 회복 포션"
+uv run --extra cpu python app.py --index C:\assets\icons
+uv run --extra cpu python app.py --folder C:\assets\icons --search "붉은색 회복 포션"
 ```
 
 이 저장소의 데모용 혼합 corpus를 사용하려면 다음 경로를 입력합니다.
 
 ```text
-C:\work\tech-demos\sample-data\assets\showcase-corpus
+C:\work\tech-demo\sample-data\assets\showcase-corpus
 ```
 
 ## 시연 및 확인
@@ -64,4 +81,4 @@ Matryoshka 임베딩을 사용합니다. 작은 픽셀아트나 세부 속성 �
 
 - Windows, Python 3.12, PyTorch CUDA 환경에서 RTX 5060 Ti 인식을 확인했습니다.
 - GPU에서 이미지와 한국어 텍스트를 각각 512차원으로 인코딩했습니다.
-- 단위 테스트는 `uv run python -m unittest -v test_app.py`로 실행합니다.
+- 노트북 CPU 환경의 단위 테스트는 `uv run --extra cpu python -m unittest -v test_app.py`로 실행합니다.

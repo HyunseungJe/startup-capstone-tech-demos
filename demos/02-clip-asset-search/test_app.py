@@ -27,12 +27,33 @@ class OutOfMemoryJinaModel:
 
 class JinaClipAdapterTests(unittest.TestCase):
     def test_runtime_device_prefers_cuda(self):
-        with patch.object(app.torch.cuda, "is_available", return_value=True):
+        with patch.dict("os.environ", {"DEVICE": "auto"}), patch.object(
+            app.torch.cuda, "is_available", return_value=True
+        ):
             self.assertEqual(app.runtime_device(), "cuda")
 
     def test_runtime_device_falls_back_to_cpu(self):
-        with patch.object(app.torch.cuda, "is_available", return_value=False):
+        with patch.dict("os.environ", {"DEVICE": "auto"}), patch.object(
+            app.torch.cuda, "is_available", return_value=False
+        ):
             self.assertEqual(app.runtime_device(), "cpu")
+
+    def test_runtime_device_honors_cpu_override_when_cuda_is_available(self):
+        with patch.dict("os.environ", {"DEVICE": "cpu"}), patch.object(
+            app.torch.cuda, "is_available", return_value=True
+        ):
+            self.assertEqual(app.runtime_device(), "cpu")
+
+    def test_runtime_device_honors_cuda_override_when_auto_detection_is_unavailable(self):
+        with patch.dict("os.environ", {"DEVICE": "cuda"}), patch.object(
+            app.torch.cuda, "is_available", return_value=False
+        ):
+            self.assertEqual(app.runtime_device(), "cuda")
+
+    def test_runtime_device_rejects_unknown_override(self):
+        with patch.dict("os.environ", {"DEVICE": "tpu"}):
+            with self.assertRaisesRegex(ValueError, "DEVICE"):
+                app.runtime_device()
 
     def test_encode_images_uses_matryoshka_dimension_and_normalizes(self):
         model = FakeJinaModel()
