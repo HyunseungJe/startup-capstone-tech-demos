@@ -1,0 +1,6 @@
+[project]
+name = "world-tool-calling"
+version = "0.1.0"
+description = "Minimal Groq tool-calling world editor"
+requires-python = ">=3.11"
+dependencies = ["openai>=1.0,<3", "python-dotenv>=1.0,<2", "jsonschema>=4.0,<5"]

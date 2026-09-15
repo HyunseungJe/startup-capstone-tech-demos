@@ -8,6 +8,7 @@
 |---|---|---|---|
 | [01 Pose to Animation · Python](demos/01-pose-to-animation/) | Video → common pose JSON → skeleton MP4 | Python, uv, Streamlit, MediaPipe | Prototype |
 | [02 CLIP Asset Search · Python](demos/02-clip-asset-search/) | Natural language → similar game asset images | Python, uv, Gradio, CLIP | Prototype |
+| [03 World Tool Calling · Python](demos/03-tool-calling/) | Natural language → tool calls → world data | Python, uv, Groq, OpenAI SDK | Prototype |
 
 새 데모는 `demos/02-name/`, `demos/03-name/`처럼 번호가 붙은 독립 폴더로 추가합니다. 각 폴더에는 최소한 목표, 실행법, 입력, 출력, 현재 상태를 설명하는 `README.md`를 둡니다.
 
@@ -17,7 +18,8 @@
 .
 ├─ demos/
 │  ├─ 01-pose-to-animation/
-│  └─ 02-clip-asset-search/
+│  ├─ 02-clip-asset-search/
+│  └─ 03-tool-calling/
 ├─ sample-data/
 │  └─ videos/
 ├─ shared/
