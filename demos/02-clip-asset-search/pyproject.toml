@@ -4,9 +4,38 @@ version = "0.1.0"
 description = "Local natural-language search for game asset images"
 requires-python = ">=3.11,<3.13"
 dependencies = [
+    "einops>=0.8,<1",
     "gradio>=5.0,<7",
     "numpy>=1.26,<3",
     "pillow>=10,<13",
-    "torch>=2.4,<3",
+    "timm>=1.0,<2",
     "transformers>=4.45,<5",
+]
+
+[project.optional-dependencies]
+cpu = ["torch>=2.4,<3"]
+cu130 = ["torch>=2.4,<3"]
+
+[tool.uv]
+conflicts = [
+    [
+        { extra = "cpu" },
+        { extra = "cu130" },
+    ],
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cu130", extra = "cu130" },
 ]
